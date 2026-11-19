@@ -1,0 +1,27 @@
+ktor:
+  application:
+    modules:
+      - com.financialtracker.server.ApplicationKt.module
+  deployment:
+    port: 8080
+    host: "0.0.0.0"
+
+database:
+  driverClassName: "org.postgresql.Driver"
+  jdbcUrl: "jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:financial_tracker}"
+  username: "${DB_USER:postgres}"
+  password: "${DB_PASSWORD:postgres_secure_pass_2026}"
+  maximumPoolSize: 10
+  minimumIdle: 2
+
+jwt:
+  secret: "${JWT_SECRET:financial_tracker_jwt_super_secret_key_2026_xyz}"
+  issuer: "${JWT_ISSUER:financial-tracker-backend}"
+  audience: "${JWT_AUDIENCE:financial-tracker-clients}"
+  realm: "Financial Tracker Services"
+  accessExpirySeconds: 3600
+  refreshExpirySeconds: 2592000
+
+redis:
+  host: "${REDIS_HOST:localhost}"
+  port: ${REDIS_PORT:6379}

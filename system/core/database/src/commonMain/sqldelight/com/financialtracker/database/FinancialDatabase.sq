@@ -1,0 +1,63 @@
+-- SQLDelight Schema for Local Offline-First Storage & Pending Sync Queue
+
+CREATE TABLE local_accounts (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    balance TEXT NOT NULL, -- Stored as string to preserve BigDecimal precision
+    currency TEXT NOT NULL,
+    color_hex TEXT NOT NULL,
+    icon_name TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE local_transactions (
+    id TEXT PRIMARY KEY NOT NULL,
+    account_id TEXT NOT NULL,
+    target_account_id TEXT,
+    category_id TEXT,
+    type TEXT NOT NULL,
+    amount TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    description TEXT NOT NULL,
+    notes TEXT,
+    transaction_date INTEGER NOT NULL,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    sync_status TEXT NOT NULL DEFAULT 'SYNCED', -- 'SYNCED', 'PENDING_CREATE', 'PENDING_UPDATE', 'PENDING_DELETE'
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE pending_sync_queue (
+    id TEXT PRIMARY KEY NOT NULL,
+    entity_type TEXT NOT NULL, -- 'TRANSACTION', 'ACCOUNT', 'BUDGET'
+    entity_id TEXT NOT NULL,
+    action TEXT NOT NULL, -- 'CREATE', 'UPDATE', 'DELETE'
+    payload_json TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    created_at INTEGER NOT NULL
+);
+
+-- Queries
+selectAllAccounts:
+SELECT * FROM local_accounts ORDER BY name ASC;
+
+insertOrReplaceAccount:
+INSERT OR REPLACE INTO local_accounts (id, name, type, balance, currency, color_hex, icon_name, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAllTransactions:
+SELECT * FROM local_transactions ORDER BY transaction_date DESC;
+
+insertOrReplaceTransaction:
+INSERT OR REPLACE INTO local_transactions (
+    id, account_id, target_account_id, category_id, type, amount, currency, description, notes, transaction_date, idempotency_key, sync_status, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectPendingSyncItems:
+SELECT * FROM pending_sync_queue ORDER BY created_at ASC;
+
+deletePendingSyncItem:
+DELETE FROM pending_sync_queue WHERE id = ?;

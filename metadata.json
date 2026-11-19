@@ -1,0 +1,8 @@
+{
+  "name": "Remix Financial Tracker",
+  "description": "Multiplatform financial tracking application with Kotlin Compose Multiplatform, Ktor REST API, PostgreSQL schema, and interactive fintech dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
