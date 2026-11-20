@@ -26,6 +26,7 @@ import { BudgetsView } from './components/BudgetsView';
 import { ReportsView } from './components/ReportsView';
 import { RecurringView } from './components/RecurringView';
 import { TransactionModal } from './components/TransactionModal';
+import { ReceiptScannerModal, ScannedReceiptData } from './components/ReceiptScannerModal';
 import { OfflineSyncModal } from './components/OfflineSyncModal';
 import { LockScreen, SecuritySettingsModal } from './components/LockScreen';
 import { AndroidBottomNav } from './components/AndroidBottomNav';
@@ -189,6 +190,9 @@ export default function App() {
 
   // Modals
   const [showTxModal, setShowTxModal] = useState<boolean>(false);
+  const [showReceiptScanner, setShowReceiptScanner] = useState<boolean>(false);
+  const [receiptScannerType, setReceiptScannerType] = useState<'INCOME' | 'EXPENSE'>('EXPENSE');
+  const [scannedReceiptData, setScannedReceiptData] = useState<ScannedReceiptData | null>(null);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [txModalType, setTxModalType] = useState<TransactionType>('EXPENSE');
   const [showDataModal, setShowDataModal] = useState<boolean>(false);
@@ -284,6 +288,7 @@ export default function App() {
   const openNewTransaction = (type: TransactionType = 'EXPENSE') => {
     setEditingTx(null);
     setTxModalType(type);
+    setScannedReceiptData(null);
     setShowTxModal(true);
   };
 
@@ -586,9 +591,9 @@ export default function App() {
             transactions={transactions}
             categories={categories}
             currency={currency}
-            onOpenNewTx={() => openNewTransaction('EXPENSE')}
-            onEditTx={openEditTransaction}
-            onDeleteTx={handleDeleteTransaction}
+        onOpenNewTx={() => openNewTransaction('EXPENSE')}
+        onEditTx={openEditTransaction}
+        onDeleteTx={handleDeleteTransaction}
           />
         )}
 
@@ -658,8 +663,15 @@ export default function App() {
         onSave={handleSaveTransaction}
         editingTransaction={editingTx}
         initialType={txModalType}
+        initialReceiptData={scannedReceiptData}
         categories={categories}
         currency={currency}
+        onScanReceipt={() => {
+          setReceiptScannerType(txModalType);
+          setShowTxModal(false);
+          setScannedReceiptData(null);
+          setShowReceiptScanner(true);
+        }}
       />
 
       {/* Local Data Management & Backup Modal */}
@@ -682,6 +694,20 @@ export default function App() {
         onLockNow={() => {
           setShowSecurityModal(false);
           setIsUnlocked(false);
+        }}
+      />
+
+      {/* Receipt Scanner Modal */}
+      <ReceiptScannerModal
+        isOpen={showReceiptScanner}
+        onClose={() => setShowReceiptScanner(false)}
+        type={receiptScannerType}
+        categories={categories}
+        onScanned={(data) => {
+          setEditingTx(null);
+          setTxModalType(receiptScannerType);
+          setScannedReceiptData(data);
+          setShowTxModal(true);
         }}
       />
 

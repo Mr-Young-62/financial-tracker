@@ -9,6 +9,7 @@ import { CURRENCIES, CurrencyCode } from './src/types.ts';
 import { convertCurrency } from './src/data/mockData.ts';
 import { filterTransactionsByPeriod, PeriodFilter } from './src/utils/finance.ts';
 import type { AppStateSnapshot } from './src/utils/api.ts';
+import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
 
@@ -183,6 +184,160 @@ async function createServer() {
         categoryBreakdown,
       },
     });
+  });
+
+  app.post('/api/v1/receipt/scan', async (req: Request, res: Response) => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({
+          status: 'error',
+          message: 'Gemini belum dikonfigurasi. Tambahkan GEMINI_API_KEY pada environment server.',
+        });
+      }
+
+      const imageBase64 = typeof req.body?.imageBase64 === 'string' ? req.body.imageBase64.trim() : '';
+      const mimeType = typeof req.body?.mimeType === 'string' && req.body.mimeType ? req.body.mimeType : 'image/jpeg';
+      const language = req.body?.language === 'en' ? 'English' : 'Indonesian';
+      const categories = Array.isArray(req.body?.categories) ? req.body.categories : [];
+
+      if (!imageBase64) {
+        return res.status(400).json({ status: 'error', message: 'Gambar struk wajib dipilih.' });
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+      const preferredModel = process.env.GEMINI_MODEL?.trim();
+      const models = Array.from(new Set([
+        preferredModel,
+        'gemini-2.5-flash',
+        'gemini-flash-lite-latest',
+        'gemini-3-flash-preview',
+        'gemini-3.1-flash-lite-preview',
+        'gemini-flash-latest',
+      ].filter((value): value is string => Boolean(value))));
+
+      const prompt = `Extract transaction data from this receipt image. Return a single JSON object only.
+Language for text fields: ${language}.
+Available categories (choose the closest match and return its exact name in categoryName, or "" if none fits): ${JSON.stringify(categories)}
+Rules:
+- amount: final total paid as a number (no currency symbol, no separators). Use 0 if unreadable.
+- currency: ISO code if visible, else "".
+- transactionDate: YYYY-MM-DD if visible, else "".
+- merchant: store or merchant name.
+- description: short transaction description.
+- categoryName: exact name from available categories or "".
+- notes: extra useful details, else "".
+- tags: array of short lowercase strings.
+JSON shape: {"merchant":"","description":"","amount":0,"currency":"","transactionDate":"","categoryName":"","notes":"","tags":[]}`;
+
+      let response: Awaited<ReturnType<typeof ai.models.generateContent>> | null = null;
+      let lastError: unknown = null;
+
+      for (const model of models) {
+        try {
+          response = await ai.models.generateContent({
+            model,
+            contents: [{
+              role: 'user',
+              parts: [
+                { inlineData: { mimeType, data: imageBase64 } },
+                { text: prompt },
+              ],
+            }],
+            config: { responseMimeType: 'application/json' },
+          });
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error;
+          const message = error instanceof Error ? error.message : String(error);
+          const retryable = /not found|no longer available|not supported|unavailable|high demand|503|404/i.test(message);
+          if (!retryable) break;
+        }
+      }
+
+      if (!response) {
+        throw lastError ?? new Error('Tidak ada model Gemini yang tersedia.');
+      }
+
+      const text = (() => {
+        const direct = (response as { text?: unknown }).text;
+        if (typeof direct === 'string' && direct.trim()) return direct.trim();
+        const parts = (response as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> })?.candidates?.[0]?.content?.parts;
+        if (Array.isArray(parts)) {
+          return parts.map((part) => (typeof part?.text === 'string' ? part.text : '')).join('').trim();
+        }
+        return '';
+      })();
+
+      if (!text) {
+        return res.status(502).json({ status: 'error', message: 'Gemini tidak mengembalikan hasil pembacaan struk.' });
+      }
+
+      let parsed: unknown;
+      try {
+        const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+        parsed = JSON.parse(cleaned);
+      } catch {
+        return res.status(502).json({ status: 'error', message: 'Hasil pembacaan struk tidak dapat diproses.' });
+      }
+
+      const raw = (parsed && typeof parsed === 'object' ? parsed : {}) as Record<string, unknown>;
+      const amount = (() => {
+        const value = raw.amount;
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string') {
+          let normalized = value.trim().replace(/[^\d,.-]/g, '');
+          if (!normalized) return undefined;
+          if (normalized.includes(',') && normalized.includes('.')) {
+            if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
+              normalized = normalized.replace(/\./g, '').replace(',', '.');
+            } else {
+              normalized = normalized.replace(/,/g, '');
+            }
+          } else if (normalized.includes(',')) {
+            const parts = normalized.split(',');
+            normalized = parts.length === 2 ? `${parts[0].replace(/\./g, '')}.${parts[1]}` : normalized.replace(/,/g, '');
+          } else {
+            const parts = normalized.split('.');
+            if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
+              normalized = normalized.replace(/\./g, '');
+            }
+          }
+          const numeric = Number(normalized);
+          return Number.isFinite(numeric) ? numeric : undefined;
+        }
+        return undefined;
+      })();
+
+      const transactionDate = typeof raw.transactionDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.transactionDate.trim())
+        ? raw.transactionDate.trim()
+        : '';
+      const tags = Array.isArray(raw.tags)
+        ? raw.tags.map((tag) => String(tag).trim().toLowerCase()).filter(Boolean)
+        : [];
+
+      res.json({
+        status: 'success',
+        data: {
+          merchant: typeof raw.merchant === 'string' ? raw.merchant.trim() : '',
+          description: typeof raw.description === 'string' ? raw.description.trim() : '',
+          amount,
+          currency: typeof raw.currency === 'string' ? raw.currency.trim() : '',
+          transactionDate,
+          categoryName: typeof raw.categoryName === 'string' ? raw.categoryName.trim() : '',
+          notes: typeof raw.notes === 'string' ? raw.notes.trim() : '',
+          tags,
+        },
+      });
+    } catch (error) {
+      console.error('Receipt scan failed:', error);
+      const detail = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({
+        status: 'error',
+        message: `Gagal membaca struk: ${detail}`,
+      });
+    }
   });
 
   // 2. Vite Dev Server Middleware or Production Static Handler

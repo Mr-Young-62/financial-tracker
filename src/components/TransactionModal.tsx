@@ -5,10 +5,19 @@ import {
   CurrencyCode, 
   TransactionType 
 } from '../types';
-import { ArrowDownRight, ArrowUpRight, X } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, X, Camera } from 'lucide-react';
 import { toDateInputValue, toDateOnlyString } from '../utils/finance';
 import { formatThousandInput, parseThousandInput } from '../utils/formatters';
 import { translateCategoryName, useLanguage } from '../utils/i18n';
+
+interface ScannedReceiptData {
+  amount?: number;
+  description?: string;
+  categoryId?: string;
+  transactionDate?: string;
+  notes?: string;
+  tags?: string[];
+}
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -16,8 +25,10 @@ interface TransactionModalProps {
   onSave: (tx: Omit<Transaction, 'id' | 'idempotencyKey' | 'syncStatus' | 'createdAt'> & { id?: string }) => void;
   editingTransaction?: Transaction | null;
   initialType?: TransactionType;
+  initialReceiptData?: ScannedReceiptData | null;
   categories: Category[];
   currency: CurrencyCode;
+  onScanReceipt?: () => void;
 }
 
 export const TransactionModal: React.FC<TransactionModalProps> = ({
@@ -26,8 +37,10 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   onSave,
   editingTransaction,
   initialType = 'EXPENSE',
+  initialReceiptData = null,
   categories,
   currency,
+  onScanReceipt,
 }) => {
   const { lang, t } = useLanguage();
   const [type, setType] = useState<TransactionType>('EXPENSE');
@@ -85,14 +98,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       setTagsInput(editingTransaction.tags.join(', '));
     } else {
       setType(initialType);
-      setAmountInput(formatThousandInput('50000'));
-      setDescription('');
-      setCategoryId(categoryForType(initialType));
-      setTransactionDate(toDateOnlyString(new Date()));
-      setNotes('');
-      setTagsInput('');
+      setAmountInput(formatThousandInput(initialReceiptData?.amount ? String(Math.round(initialReceiptData.amount)) : '50000'));
+      setDescription(initialReceiptData?.description || '');
+      setCategoryId(initialReceiptData?.categoryId || categoryForType(initialType));
+      setTransactionDate(initialReceiptData?.transactionDate || toDateOnlyString(new Date()));
+      setNotes(initialReceiptData?.notes || '');
+      setTagsInput(initialReceiptData?.tags?.join(', ') || '');
     }
-  }, [editingTransaction, isOpen, categories, initialType]);
+  }, [editingTransaction, isOpen, categories, initialType, initialReceiptData]);
 
   if (!isMounted) return null;
 
@@ -156,7 +169,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         </div>
 
         {/* Transaction Type Segmented Switcher */}
-        <div className="grid grid-cols-2 gap-1 p-1 bg-[#F1ECE3] dark:bg-[#1E1D27] rounded-xl border border-[#DDD7CD] dark:border-[#2D2A3B]">
+        <div className={`grid ${!editingTransaction && onScanReceipt ? 'grid-cols-3' : 'grid-cols-2'} gap-1 p-1 bg-[#F1ECE3] dark:bg-[#1E1D27] rounded-xl border border-[#DDD7CD] dark:border-[#2D2A3B]`}>
           <button
             type="button"
             onClick={() => {
@@ -174,6 +187,18 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             <span>{t.common.expense}</span>
           </button>
 
+          {!editingTransaction && onScanReceipt && (
+            <button
+              type="button"
+              onClick={onScanReceipt}
+              aria-label={lang === 'id' ? 'Scan struk' : 'Scan receipt'}
+              className="min-h-[44px] py-2.5 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors text-[#686377] dark:text-[#9D98AC] hover:text-[#16151D] hover:bg-white/5 dark:hover:bg-white/5"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span className="text-[10px]">{lang === 'id' ? 'Struk' : 'Receipt'}</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => {
@@ -190,7 +215,6 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
             <ArrowDownRight className="w-3.5 h-3.5" />
             <span>{t.common.income}</span>
           </button>
-
         </div>
 
         {/* Inputs */}

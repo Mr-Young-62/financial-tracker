@@ -131,13 +131,15 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={onOpenNewTx}
-          className="px-4 py-2 text-xs font-bold text-white dark:text-[#121118] bg-[#121118] dark:bg-[#B8B2FF] hover:bg-[#252230] dark:hover:bg-[#A8A0FC] btn-tactile rounded-xl shadow-xs flex items-center gap-2 self-start sm:self-auto cursor-pointer"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
-          <span>{t.transactions.recordBtn}</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={onOpenNewTx}
+            className="px-4 py-2 text-xs font-bold text-white dark:text-[#121118] bg-[#121118] dark:bg-[#B8B2FF] hover:bg-[#252230] dark:hover:bg-[#A8A0FC] btn-tactile rounded-xl shadow-xs flex items-center gap-2 cursor-pointer"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>{t.transactions.recordBtn}</span>
+          </button>
+        </div>
       </section>
 
       {/* Filter Toolbar */}
