@@ -208,9 +208,6 @@ export function isAppStateSnapshot(value: unknown): value is AppStateSnapshot {
 function normalizeSnapshot(snapshot: AppStateSnapshot): AppStateSnapshot {
   return {
     ...snapshot,
-    transactions: snapshot.transactions.map((tx) =>
-      tx.syncStatus === 'SYNCED' ? tx : { ...tx, syncStatus: 'SYNCED' }
-    ),
     // Defaults keep older backups/snapshots valid without a schema bump;
     // malformed auxiliary entries are dropped rather than failing the load.
     notificationDrafts: (snapshot.notificationDrafts ?? []).filter(isValidNotificationDraft),

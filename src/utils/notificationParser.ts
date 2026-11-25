@@ -289,9 +289,10 @@ function extractDate(combined: string): { iso: string | null } {
     const mm = time ? Number(time[2]) : 0;
     if (hh > 23 || mm > 59) continue;
 
-    const date = new Date(y, m - 1, d, hh, mm, 0, 0);
-    // Reject overflow dates like 31/02
-    if (date.getMonth() !== m - 1 || date.getDate() !== d) continue;
+    const date = new Date(Date.UTC(y, m - 1, d, hh, mm, 0, 0));
+    // Reject overflow dates like 31/02 (validate using UTC getters to avoid
+    // local-timezone shifts that can move the date a day forward/backward).
+    if (date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) continue;
     if (date.getTime() > now.getTime() + 24 * 60 * 60 * 1000) continue;
     return { iso: date.toISOString() };
   }
@@ -309,10 +310,12 @@ function extractDate(combined: string): { iso: string | null } {
       const time = TIME_PATTERN.exec(combined);
       const hh = time ? Number(time[1]) : 12;
       const mm = time ? Number(time[2]) : 0;
-      const date = new Date(year, monthIdx, day, hh <= 23 ? hh : 12, mm <= 59 ? mm : 0, 0, 0);
+      const date = new Date(
+        Date.UTC(year, monthIdx, day, hh <= 23 ? hh : 12, mm <= 59 ? mm : 0, 0, 0)
+      );
       if (
-        date.getMonth() === monthIdx &&
-        date.getDate() === day &&
+        date.getUTCMonth() === monthIdx &&
+        date.getUTCDate() === day &&
         date.getTime() <= now.getTime() + 24 * 60 * 60 * 1000
       ) {
         return { iso: date.toISOString() };

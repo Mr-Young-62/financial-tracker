@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Camera, ImagePlus, Loader2, X } from 'lucide-react';
 import { Category } from '../types';
 import { translateCategoryName, useLanguage } from '../utils/i18n';
+import { parseAmount } from '../utils/amount';
 
 export interface ScannedReceiptData {
   amount?: number;
@@ -30,32 +31,6 @@ const fileToBase64 = (file: File) =>
     };
     reader.readAsDataURL(file);
   });
-
-const parseAmount = (value: unknown): number | undefined => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    let normalized = value.trim().replace(/[^\d,.-]/g, '');
-    if (!normalized) return undefined;
-    if (normalized.includes(',') && normalized.includes('.')) {
-      if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
-        normalized = normalized.replace(/\./g, '').replace(',', '.');
-      } else {
-        normalized = normalized.replace(/,/g, '');
-      }
-    } else if (normalized.includes(',')) {
-      const parts = normalized.split(',');
-      normalized = parts.length === 2 ? `${parts[0].replace(/\./g, '')}.${parts[1]}` : normalized.replace(/,/g, '');
-    } else {
-      const parts = normalized.split('.');
-      if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
-        normalized = normalized.replace(/\./g, '');
-      }
-    }
-    const numeric = Number(normalized);
-    return Number.isFinite(numeric) ? numeric : undefined;
-  }
-  return undefined;
-};
 
 const parseDate = (value: unknown): string => {
   const fallback = new Date().toISOString().slice(0, 10);

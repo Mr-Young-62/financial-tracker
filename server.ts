@@ -5,9 +5,17 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { TAB_SEO_REGISTRY } from './src/utils/seo.ts';
-import { CURRENCIES, CurrencyCode } from './src/types.ts';
+import {
+  Budget,
+  Category,
+  CURRENCIES,
+  CurrencyCode,
+  RecurringTransaction,
+  Transaction,
+} from './src/types.ts';
 import { convertCurrency } from './src/data/mockData.ts';
 import { filterTransactionsByPeriod, PeriodFilter } from './src/utils/finance.ts';
+import { parseAmount } from './src/utils/amount.ts';
 import type { AppStateSnapshot } from './src/utils/api.ts';
 import { GoogleGenAI } from '@google/genai';
 
@@ -23,18 +31,73 @@ const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
 const DATA_DIR = path.resolve(__dirname, 'data');
 const STATE_FILE = path.join(DATA_DIR, 'app-state.json');
 
+const isValidCurrency = (code: unknown): code is CurrencyCode =>
+  typeof code === 'string' && code in CURRENCIES;
+
+const isValidCategory = (item: unknown): item is Category => {
+  const it = item as Record<string, unknown>;
+  return (
+    typeof it.id === 'string' &&
+    typeof it.name === 'string' &&
+    (it.type === 'INCOME' || it.type === 'EXPENSE')
+  );
+};
+
+const isValidTransaction = (item: unknown): item is Transaction => {
+  const it = item as Record<string, unknown>;
+  return (
+    typeof it.id === 'string' &&
+    typeof it.amount === 'number' &&
+    Number.isFinite(it.amount) &&
+    isValidCurrency(it.currency) &&
+    (it.type === 'INCOME' || it.type === 'EXPENSE') &&
+    typeof it.transactionDate === 'string' &&
+    typeof it.idempotencyKey === 'string' &&
+    typeof it.createdAt === 'string' &&
+    Array.isArray(it.tags) &&
+    it.tags.every((tag) => typeof tag === 'string')
+  );
+};
+
+const isValidBudget = (item: unknown): item is Budget => {
+  const it = item as Record<string, unknown>;
+  return (
+    typeof it.id === 'string' &&
+    typeof it.categoryId === 'string' &&
+    typeof it.monthlyLimit === 'number' &&
+    Number.isFinite(it.monthlyLimit) &&
+    isValidCurrency(it.currency)
+  );
+};
+
+const isValidRecurring = (item: unknown): item is RecurringTransaction => {
+  const it = item as Record<string, unknown>;
+  return (
+    typeof it.id === 'string' &&
+    typeof it.amount === 'number' &&
+    Number.isFinite(it.amount) &&
+    isValidCurrency(it.currency) &&
+    (it.type === 'INCOME' || it.type === 'EXPENSE') &&
+    typeof it.interval === 'string' &&
+    typeof it.nextRunDate === 'string' &&
+    typeof it.isActive === 'boolean'
+  );
+};
+
 function isPersistedState(value: unknown): value is AppStateSnapshot {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<AppStateSnapshot>;
-  const isObjectArray = (input: unknown) =>
-    Array.isArray(input) && input.every((item) => item !== null && typeof item === 'object');
 
   return (
-    isObjectArray(candidate.categories) &&
-    isObjectArray(candidate.transactions) &&
-    isObjectArray(candidate.budgets) &&
-    isObjectArray(candidate.recurringList) &&
-    typeof candidate.currency === 'string'
+    Array.isArray(candidate.categories) &&
+    candidate.categories.every(isValidCategory) &&
+    Array.isArray(candidate.transactions) &&
+    candidate.transactions.every(isValidTransaction) &&
+    Array.isArray(candidate.budgets) &&
+    candidate.budgets.every(isValidBudget) &&
+    Array.isArray(candidate.recurringList) &&
+    candidate.recurringList.every(isValidRecurring) &&
+    isValidCurrency(candidate.currency)
   );
 }
 
@@ -111,9 +174,15 @@ async function createServer() {
       });
     }
 
-    const requestedCurrency = String(req.query.currency || state.currency || 'IDR') as CurrencyCode;
+    const requestedCurrency = (
+      Array.isArray(req.query.currency)
+        ? req.query.currency[0]
+        : req.query.currency ?? (state.currency || 'IDR')
+    ) as CurrencyCode;
     const currency = CURRENCIES[requestedCurrency] ? requestedCurrency : 'IDR';
-    const requestedPeriod = String(req.query.period || 'this_month') as PeriodFilter;
+    const requestedPeriod = (
+      Array.isArray(req.query.period) ? req.query.period[0] : req.query.period ?? 'this_month'
+    ) as PeriodFilter;
     const period: PeriodFilter = ['today', 'this_week', 'this_month', 'this_year', 'all'].includes(requestedPeriod)
       ? requestedPeriod
       : 'this_month';
@@ -196,7 +265,9 @@ async function createServer() {
         });
       }
 
-      const imageBase64 = typeof req.body?.imageBase64 === 'string' ? req.body.imageBase64.trim() : '';
+      const imageBase64 = typeof req.body?.imageBase64 === 'string'
+        ? req.body.imageBase64.trim().replace(/^data:image\/[^;]+;base64,/, '')
+        : '';
       const mimeType = typeof req.body?.mimeType === 'string' && req.body.mimeType ? req.body.mimeType : 'image/jpeg';
       const language = req.body?.language === 'en' ? 'English' : 'Indonesian';
       const categories = Array.isArray(req.body?.categories) ? req.body.categories : [];
@@ -283,32 +354,7 @@ JSON shape: {"merchant":"","description":"","amount":0,"currency":"","transactio
       }
 
       const raw = (parsed && typeof parsed === 'object' ? parsed : {}) as Record<string, unknown>;
-      const amount = (() => {
-        const value = raw.amount;
-        if (typeof value === 'number' && Number.isFinite(value)) return value;
-        if (typeof value === 'string') {
-          let normalized = value.trim().replace(/[^\d,.-]/g, '');
-          if (!normalized) return undefined;
-          if (normalized.includes(',') && normalized.includes('.')) {
-            if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
-              normalized = normalized.replace(/\./g, '').replace(',', '.');
-            } else {
-              normalized = normalized.replace(/,/g, '');
-            }
-          } else if (normalized.includes(',')) {
-            const parts = normalized.split(',');
-            normalized = parts.length === 2 ? `${parts[0].replace(/\./g, '')}.${parts[1]}` : normalized.replace(/,/g, '');
-          } else {
-            const parts = normalized.split('.');
-            if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
-              normalized = normalized.replace(/\./g, '');
-            }
-          }
-          const numeric = Number(normalized);
-          return Number.isFinite(numeric) ? numeric : undefined;
-        }
-        return undefined;
-      })();
+      const amount = parseAmount(raw.amount);
 
       const transactionDate = typeof raw.transactionDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.transactionDate.trim())
         ? raw.transactionDate.trim()

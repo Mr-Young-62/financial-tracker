@@ -61,9 +61,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onRefresh,
 }) => {
   const { lang, t } = useLanguage();
-  const now = useMemo(() => new Date(), []);
+  const now = new Date();
   const [selectedChartDateKey, setSelectedChartDateKey] = useState<string>(() =>
-    new Date().toDateString()
+    now.toDateString()
   );
 
   const periodLabel = translatePeriodLabel(timeFilter, lang, now);
@@ -76,7 +76,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // 1. Filter transactions based on the selected period
   const filteredTransactions = useMemo(() => {
     return filterTransactionsByPeriod(transactions, timeFilter, now);
-  }, [transactions, timeFilter, now]);
+  }, [transactions, timeFilter]);
 
   // 3. Compute Income, Expense, and Net Cash Flow
   const { totalIncome, totalExpense, netCashFlow } = useMemo(() => {
@@ -130,7 +130,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // 5. Budget Utilization Status (always the current calendar month)
   const monthlyTransactions = useMemo(
     () => filterTransactionsByPeriod(transactions, 'this_month', now),
-    [transactions, now]
+    [transactions]
   );
 
   const budgetStatuses = useMemo(() => {
@@ -201,7 +201,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       isPeak: value.amount > 0 && value.amount === max,
       isToday: value.key === now.toDateString(),
     }));
-  }, [transactions, currency, now, lang]);
+  }, [transactions, currency, lang]);
 
   const asOfLabel = now.toLocaleDateString(getDateLocale(lang), {
     day: 'numeric',

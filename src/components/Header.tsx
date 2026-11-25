@@ -9,11 +9,14 @@ import {
   ShieldCheck,
   BellRing
 } from 'lucide-react';
+import { CURRENCIES, CurrencyCode } from '../types';
 import { useLanguage } from '../utils/i18n';
 
 interface HeaderProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
+  currency: CurrencyCode;
+  onCurrencyChange: (code: CurrencyCode) => void;
   isDark: boolean;
   toggleTheme: () => void;
   onOpenDataModal: () => void;
@@ -25,6 +28,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   currentTab,
   setCurrentTab,
+  currency,
+  onCurrencyChange,
   isDark,
   toggleTheme,
   onOpenDataModal,
@@ -34,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { lang, setLang, t } = useLanguage();
   const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
+  const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
 
   const mainNavItems = [
     { id: 'dashboard', label: t.header.navOverview },
@@ -115,6 +121,48 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
                 );
               })}
+            </div>
+
+            {/* Compact Currency Switcher */}
+            <div className="relative">
+              <button
+                onClick={() => setCurrencyDropdownOpen(!currencyDropdownOpen)}
+                className="min-h-[36px] sm:min-h-[38px] px-2 sm:px-2.5 py-1.5 rounded-xl sm:rounded-2xl text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-colors border btn-tactile cursor-pointer"
+                title={t.header.switchCurrency}
+                aria-label={t.header.switchCurrency}
+              >
+                <span className="hidden sm:inline">
+                  {CURRENCIES[currency].symbol} {currency}
+                </span>
+                <ChevronDown className="w-3 h-3 opacity-60 hidden sm:inline" />
+              </button>
+
+              {currencyDropdownOpen && (
+                <div
+                  className="absolute right-0 mt-2 w-48 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-[#1A1726] rounded-2xl border border-[#E5DDD0] dark:border-[#2E283F] shadow-xl py-1 z-50 text-xs text-[#181522] dark:text-[#F5F3FA] animate-fadeIn"
+                  onMouseLeave={() => setCurrencyDropdownOpen(false)}
+                >
+                  {(Object.keys(CURRENCIES) as CurrencyCode[]).map((code) => {
+                    const conf = CURRENCIES[code];
+                    return (
+                      <button
+                        key={code}
+                        onClick={() => {
+                          onCurrencyChange(code);
+                          setCurrencyDropdownOpen(false);
+                        }}
+                        className="w-full min-h-[44px] px-3.5 py-2 text-left flex items-center gap-2.5 hover:bg-[#FBF8F2] dark:hover:bg-[#252132] transition-colors btn-tactile cursor-pointer"
+                      >
+                        <span>{conf.symbol}</span>
+                        <span className="font-semibold">{code}</span>
+                        <span className="ml-auto text-[10px] text-[#706B82] dark:text-[#9D98AC]">
+                          {conf.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Tools Dropdown */}

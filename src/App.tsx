@@ -14,10 +14,7 @@ import {
   RecurringTransaction,
   TransactionType,
 } from './types';
-import {
-  INITIAL_CATEGORIES,
-  formatCurrency,
-} from './data/mockData';
+import { INITIAL_CATEGORIES, formatCurrency } from './data/mockData';
 import { CheckCircle2, Trash2 } from 'lucide-react';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
@@ -50,6 +47,8 @@ import type { DedupEntry } from './utils/notificationDedup';
 import { NotificationDraft } from './types';
 import { NotificationSettingsModal } from './components/NotificationSettingsModal';
 import { NotificationDraftsModal } from './components/NotificationDraftsModal';
+import { UpdateModal } from './components/UpdateModal';
+import { checkForUpdate, AvailableUpdate } from './utils/update';
 import {
   addRecurringInterval,
   createId,
@@ -93,8 +92,8 @@ export default function App() {
   // Dynamic SEO & Document Head Metadata Service Hook
   useTabSeo(currentTab);
 
-  // Currency & Filter states (currency locked to IDR)
-  const currency: CurrencyCode = 'IDR';
+  // Currency & Filter states
+  const [currency, setCurrency] = useState<CurrencyCode>('IDR');
   const [timeFilter, setTimeFilter] = useState<PeriodFilter>('this_month');
 
   // Data states (start clean with empty records on fresh installs)
@@ -181,6 +180,7 @@ export default function App() {
   const [notificationDrafts, setNotificationDrafts] = useState<NotificationDraft[]>([]);
   const [showNotificationSettings, setShowNotificationSettings] = useState<boolean>(false);
   const [showNotificationDrafts, setShowNotificationDrafts] = useState<boolean>(false);
+  const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(null);
   const [confirmingDraftId, setConfirmingDraftId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -419,6 +419,26 @@ export default function App() {
     }
     saveThemePreference(isDark);
   }, [isDark]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      const update = await checkForUpdate();
+      if (!cancelled && update) setAvailableUpdate(update);
+    };
+    void check();
+
+    let resumeHandle: PluginListenerHandle | null = null;
+    if (Capacitor.isNativePlatform()) {
+      void CapacitorApp.addListener('resume', () => void check()).then((handle) => {
+        resumeHandle = handle;
+      });
+    }
+    return () => {
+      cancelled = true;
+      if (resumeHandle) void resumeHandle.remove();
+    };
+  }, []);
 
   const toggleTheme = () => setIsDark(!isDark);
 
@@ -732,6 +752,8 @@ export default function App() {
       <Header
         currentTab={currentTab}
         setCurrentTab={handleTabChange}
+        currency={currency}
+        onCurrencyChange={setCurrency}
         isDark={isDark}
         toggleTheme={toggleTheme}
         onOpenDataModal={() => setShowDataModal(true)}
@@ -882,6 +904,10 @@ export default function App() {
         onConfirmDraft={handleConfirmDraft}
         onDeleteDraft={handleDeleteDraft}
       />
+
+      {availableUpdate && (
+        <UpdateModal update={availableUpdate} onLater={() => setAvailableUpdate(null)} />
+      )}
 
       {/* Receipt Scanner Modal */}
       <ReceiptScannerModal

@@ -72,7 +72,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'>('date_desc');
   const [selectedTxDetail, setSelectedTxDetail] = useState<Transaction | null>(null);
 
-  const now = useMemo(() => new Date(), []);
+  const now = new Date();
   const periodLabel = translatePeriodLabel(periodFilter, lang, now);
 
   // Filter and sort transactions
@@ -108,7 +108,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         if (sortBy === 'amount_desc') return amtB - amtA;
         return amtA - amtB;
       });
-  }, [transactions, searchQuery, typeFilter, categoryFilter, periodFilter, sortBy, currency, now]);
+  }, [transactions, searchQuery, typeFilter, categoryFilter, periodFilter, sortBy, currency]);
 
   if (isLoading) {
     return <TransactionsSkeleton />;

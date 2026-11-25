@@ -163,6 +163,7 @@ const idTranslations = {
     toolsTitle: 'Alat & Pengaturan',
     toggleTheme: 'Ganti Tema',
     switchLanguage: 'Pilih Bahasa',
+    switchCurrency: 'Pilih Mata Uang',
   },
   bottomNav: {
     ariaLabel: 'Navigasi Bawah Mobile',
@@ -545,6 +546,7 @@ const enTranslations: TranslationDictionary = {
     toolsTitle: 'Tools & Settings',
     toggleTheme: 'Toggle Theme',
     switchLanguage: 'Select Language',
+    switchCurrency: 'Choose Currency',
   },
   bottomNav: {
     ariaLabel: 'Mobile Navigation Dock',

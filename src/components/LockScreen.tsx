@@ -55,7 +55,9 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   const [biometricChoice, setBiometricChoice] = useState<boolean>(() =>
     isChangePin ? isBiometricEnabled() : true
   );
-  const [biometricConfigured] = useState<boolean>(() => isBiometricEnabled());
+  const [biometricConfigured, setBiometricConfigured] = useState<boolean>(() =>
+    isBiometricEnabled()
+  );
 
   const autoPromptTriggeredRef = useRef<boolean>(false);
   const biometricLabel = translateBiometryLabel(biometricInfo.label, lang);
@@ -86,6 +88,9 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     setPinInput('');
     setErrorMessage(null);
     setIsSubmitting(false);
+    // Refresh on every mount/navigate so a biometric toggle elsewhere
+    // (SecuritySettingsModal) is not stale when the lock screen re-opens.
+    setBiometricConfigured(isBiometricEnabled());
 
     checkBiometricSupport().then((info) => {
       if (cancelled) return;
