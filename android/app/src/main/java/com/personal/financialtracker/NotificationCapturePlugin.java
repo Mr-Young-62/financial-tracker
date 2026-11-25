@@ -70,7 +70,7 @@ public class NotificationCapturePlugin extends Plugin {
             // Some OEMs strip the intent; fall back to app notification settings.
             try {
                 Intent fallback = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                    .putExtra(Settings.EXTRA_APP_URI, Uri.parse("package:" + getContext().getPackageName()));
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getContext().getPackageName());
                 fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 activity.startActivity(fallback);
                 call.resolve(new JSObject());

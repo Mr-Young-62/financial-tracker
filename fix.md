@@ -153,6 +153,18 @@ dilakukan di codebase TypeScript/React + Express.
 
 ## Verifikasi (2026-11-25)
 
+### 10. Android build gagal karena konstanta Settings tidak valid
+
+- **Lokasi**: `android/app/src/main/java/com/personal/financialtracker/NotificationCapturePlugin.java`
+- **Gejala**: GitHub Actions gagal pada `compileDebugJavaWithJavac` dengan
+  `cannot find symbol: Settings.EXTRA_APP_URI`.
+- **Penyebab**: `EXTRA_APP_URI` bukan konstanta Android SDK. Fallback intent
+  untuk pengaturan notifikasi memakai extra yang salah.
+- **Fix**: Ganti dengan `Settings.EXTRA_APP_PACKAGE` dan kirim package name
+  sebagai `String`, sesuai kontrak `ACTION_APP_NOTIFICATION_SETTINGS`.
+- **Status**: ✅ Fixed secara kode; workflow perlu dijalankan ulang setelah
+  perubahan ini dipush ke GitHub.
+
 - `npx tsc --noEmit` → **clean** (exit 0, tanpa error)
 - `npm test` → **39 tests, 39 pass, 0 fail, 0 skipped**
   - `notificationParser.test.ts`
