@@ -112,6 +112,33 @@ Ditambahkan untuk repository:
 Mr-Young-62/financial-tracker
 ```
 
+### Upload release otomatis
+
+Ditambahkan workflow `.github/workflows/release.yml`. Workflow berjalan
+ketika tag versi didorong ke GitHub:
+
+```powershell
+git add .
+git commit -m "ci: automate GitHub releases"
+git push origin main
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+GitHub Actions kemudian menjalankan `npm ci`, type-check, build web,
+`npx cap sync android`, build debug APK, dan membuat GitHub Release dengan
+asset `app-debug.apk` secara otomatis. Workflow juga dapat dijalankan dari
+tab **Actions** memakai `workflow_dispatch` dan input tag.
+
+> Saat ini workflow menghasilkan **debug APK** karena project belum memiliki
+> Android release keystore. Debug APK aman untuk testing, tetapi untuk update
+> di atas APK release yang sudah terpasang, siapkan keystore yang sama dan
+> ubah workflow ke `assembleRelease`.
+
+Workflow memakai Android SDK bawaan GitHub Runner dan tidak lagi memakai
+`android-actions/setup-android@v3`, karena action tersebut mencoba memasang
+package legacy `tools` yang sudah tidak tersedia pada SDK modern.
+
 ### File update
 
 - `src/config.ts` — versi aplikasi (`APP_VERSION`) dan repository GitHub.
