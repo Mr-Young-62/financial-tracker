@@ -38,6 +38,15 @@ interface NotificationCapturePluginLike {
   listCandidateApps(): Promise<{ apps: CandidateApp[] }>;
   getPendingNotifications(): Promise<{ items: PendingNotificationItem[] }>;
   acknowledgeNotifications(options: { ids: string[] }): Promise<{ removed: number }>;
+  downloadAndInstallApk(options: { url: string }): Promise<void>;
+}
+
+export async function downloadAndInstallApk(url: string): Promise<void> {
+  if (!isCaptureAvailable()) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  await plugin.downloadAndInstallApk({ url });
 }
 
 const plugin = registerPlugin<NotificationCapturePluginLike>('NotificationCapture');

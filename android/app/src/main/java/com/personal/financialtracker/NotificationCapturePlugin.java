@@ -6,6 +6,14 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.provider.Settings;
+import android.content.ClipData;
+import androidx.core.content.FileProvider;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -78,6 +86,50 @@ public class NotificationCapturePlugin extends Plugin {
                 call.reject("settings_unavailable", "Could not open notification settings");
             }
         }
+    }
+
+    @PluginMethod
+    public void downloadAndInstallApk(PluginCall call) {
+        String downloadUrl = call.getString("url");
+        Activity activity = getActivity();
+        if (activity == null || downloadUrl == null || !downloadUrl.startsWith("https://")) {
+            call.reject("invalid_update", "A secure APK download URL is required");
+            return;
+        }
+
+        new Thread(() -> {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(downloadUrl).openConnection();
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(120000);
+                connection.setInstanceFollowRedirects(true);
+                if (connection.getResponseCode() < 200 || connection.getResponseCode() >= 300) {
+                    throw new Exception("APK download failed: HTTP " + connection.getResponseCode());
+                }
+
+                File apk = new File(getContext().getCacheDir(), "financial-tracker-update.apk");
+                try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(apk)) {
+                    byte[] buffer = new byte[8192];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                }
+
+                Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", apk);
+                Intent install = new Intent(Intent.ACTION_VIEW);
+                install.setDataAndType(uri, "application/vnd.android.package-archive");
+                install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                install.setClipData(ClipData.newRawUri("update", uri));
+                activity.runOnUiThread(() -> {
+                    activity.startActivity(install);
+                    call.resolve(new JSObject());
+                });
+            } catch (Exception error) {
+                activity.runOnUiThread(() -> call.reject("update_failed", error.getMessage()));
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }).start();
     }
 
     @PluginMethod
