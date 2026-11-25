@@ -6,7 +6,8 @@ import {
   Repeat,
   ChevronDown,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  BellRing
 } from 'lucide-react';
 import { useLanguage } from '../utils/i18n';
 
@@ -17,6 +18,8 @@ interface HeaderProps {
   toggleTheme: () => void;
   onOpenDataModal: () => void;
   onOpenSecurityModal: () => void;
+  onOpenNotificationSettings?: () => void;
+  notificationDraftsCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,6 +29,8 @@ export const Header: React.FC<HeaderProps> = ({
   toggleTheme,
   onOpenDataModal,
   onOpenSecurityModal,
+  onOpenNotificationSettings,
+  notificationDraftsCount,
 }) => {
   const { lang, setLang, t } = useLanguage();
   const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
@@ -167,6 +172,24 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     <ShieldCheck className="w-4 h-4 shrink-0 text-[#704BEA] dark:text-[#B8B0FF]" />
                     <span>{t.common.securityMenu}</span>
+                  </button>
+
+                  <div className="border-t border-[#EDE7DE] dark:border-[#2C273B] my-1" />
+
+                  <button
+                    onClick={() => {
+                      onOpenNotificationSettings?.();
+                      setToolsDropdownOpen(false);
+                    }}
+                    className="w-full min-h-[44px] px-3.5 py-2 text-left flex items-center gap-2.5 hover:bg-[#FBF8F2] dark:hover:bg-[#252132] transition-colors btn-tactile"
+                  >
+                    <BellRing className="w-4 h-4 shrink-0 text-[#704BEA] dark:text-[#B8B0FF]" />
+                    <span>{t.notificationCapture.menuItem}</span>
+                    {notificationDraftsCount && notificationDraftsCount > 0 && (
+                      <span className="ml-auto px-2 py-0.5 text-[10px] font-bold bg-[#704BEA] text-white rounded-full">
+                        {notificationDraftsCount}
+                      </span>
+                    )}
                   </button>
                 </div>
               )}

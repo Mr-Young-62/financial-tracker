@@ -45,6 +45,33 @@ export interface Transaction {
   createdAt: string;
 }
 
+/**
+ * A transaction candidate captured from an Android notification. Drafts always
+ * require explicit user confirmation before becoming a Transaction.
+ */
+export interface NotificationDraft {
+  id: string;
+  /** Stable content hash used to prevent duplicate drafts (see notificationDedup). */
+  dedupeKey: string;
+  sourcePackage: string;
+  /** Notification title as provided by the source app (kept locally only). */
+  title: string;
+  /** Notification body as provided by the source app (kept locally only). */
+  text: string;
+  type: TransactionType | null;
+  amount: number | null;
+  currency: CurrencyCode | null;
+  description: string;
+  /** ISO date string parsed from the notification text, or null when unavailable. */
+  transactionDate: string | null;
+  needsReview: boolean;
+  /** Machine-readable reasons why the draft needs user review (never raw content). */
+  reviewReasons: string[];
+  /** ISO timestamp of when the notification was posted. */
+  receivedAt: string;
+  createdAt: string;
+}
+
 export interface Budget {
   id: string;
   categoryId: string;

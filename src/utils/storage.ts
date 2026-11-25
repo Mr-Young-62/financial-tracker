@@ -11,11 +11,13 @@ import {
   CURRENCIES,
   Category,
   CurrencyCode,
+  NotificationDraft,
   RecurringInterval,
   RecurringTransaction,
   Transaction,
 } from '../types';
 import { toDateOnlyString } from './finance';
+import { DedupEntry } from './notificationDedup';
 
 export interface AppStateSnapshot {
   categories: Category[];
@@ -23,6 +25,13 @@ export interface AppStateSnapshot {
   budgets: Budget[];
   recurringList: RecurringTransaction[];
   currency: CurrencyCode;
+  /**
+   * Pending transaction drafts captured from Android notifications. Optional so
+   * older backups/snapshots remain valid; defaults to [] on load.
+   */
+  notificationDrafts?: NotificationDraft[];
+  /** Bounded dedupe memory (hash + timestamp only, never raw content). */
+  notificationDedup?: DedupEntry[];
 }
 
 export interface BackupFilePayload {
@@ -145,9 +154,44 @@ function isValidRecurring(value: unknown): value is RecurringTransaction {
   );
 }
 
+function isValidDedupEntry(value: unknown): value is DedupEntry {
+  if (!isRecord(value)) return false;
+  return (
+    isNonEmptyString(value.key) &&
+    typeof value.seenAt === 'number' &&
+    Number.isFinite(value.seenAt)
+  );
+}
+
+function isValidNotificationDraft(value: unknown): value is NotificationDraft {
+  if (!isRecord(value)) return false;
+  return (
+    isNonEmptyString(value.id) &&
+    isNonEmptyString(value.dedupeKey) &&
+    isNonEmptyString(value.sourcePackage) &&
+    typeof value.title === 'string' &&
+    typeof value.text === 'string' &&
+    (value.type === null || value.type === 'INCOME' || value.type === 'EXPENSE') &&
+    (value.amount === null ||
+      (typeof value.amount === 'number' && Number.isFinite(value.amount) && value.amount >= 0)) &&
+    (value.currency === null || isValidCurrency(value.currency)) &&
+    typeof value.description === 'string' &&
+    (value.transactionDate === null || isNonEmptyString(value.transactionDate)) &&
+    typeof value.needsReview === 'boolean' &&
+    Array.isArray(value.reviewReasons) &&
+    value.reviewReasons.every((reason) => typeof reason === 'string') &&
+    isNonEmptyString(value.receivedAt) &&
+    isNonEmptyString(value.createdAt)
+  );
+}
+
 /** Validates that an unknown value satisfies the complete AppStateSnapshot schema. */
 export function isAppStateSnapshot(value: unknown): value is AppStateSnapshot {
   if (!isRecord(value)) return false;
+  // NOTE: notificationDrafts/notificationDedup are deliberately NOT part of
+  // the hard validation — a corrupted auxiliary array must never reject the
+  // whole snapshot (that would lose all transactions). normalizeSnapshot()
+  // drops invalid entries instead.
   return (
     Array.isArray(value.categories) &&
     value.categories.every(isValidCategory) &&
@@ -167,6 +211,10 @@ function normalizeSnapshot(snapshot: AppStateSnapshot): AppStateSnapshot {
     transactions: snapshot.transactions.map((tx) =>
       tx.syncStatus === 'SYNCED' ? tx : { ...tx, syncStatus: 'SYNCED' }
     ),
+    // Defaults keep older backups/snapshots valid without a schema bump;
+    // malformed auxiliary entries are dropped rather than failing the load.
+    notificationDrafts: (snapshot.notificationDrafts ?? []).filter(isValidNotificationDraft),
+    notificationDedup: (snapshot.notificationDedup ?? []).filter(isValidDedupEntry),
   };
 }
 

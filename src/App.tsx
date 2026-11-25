@@ -42,6 +42,15 @@ import {
 import { hasPinConfigured } from './utils/security';
 import { useLanguage } from './utils/i18n';
 import {
+  drainQueueIntoSnapshot,
+  getCaptureHealth,
+  CaptureHealth,
+} from './utils/notificationPipeline';
+import type { DedupEntry } from './utils/notificationDedup';
+import { NotificationDraft } from './types';
+import { NotificationSettingsModal } from './components/NotificationSettingsModal';
+import { NotificationDraftsModal } from './components/NotificationDraftsModal';
+import {
   addRecurringInterval,
   createId,
   endOfDay,
@@ -131,6 +140,9 @@ export default function App() {
 
   const [isHydrated, setIsHydrated] = useState<boolean>(false);
 
+  const notificationDedupRef = useRef<DedupEntry[]>([]);
+  const notificationDraftsRef = useRef<NotificationDraft[]>([]);
+
   const applySnapshot = (snapshot: AppStateSnapshot) => {
     transactionsRef.current = snapshot.transactions;
     recurringRef.current = snapshot.recurringList;
@@ -138,6 +150,10 @@ export default function App() {
     setTransactions(snapshot.transactions);
     setBudgets(snapshot.budgets);
     setRecurringList(snapshot.recurringList);
+    const drafts = snapshot.notificationDrafts ?? [];
+    notificationDraftsRef.current = drafts;
+    setNotificationDrafts(drafts);
+    notificationDedupRef.current = snapshot.notificationDedup ?? [];
   };
 
   // Hydrate state from local storage on startup.
@@ -160,6 +176,77 @@ export default function App() {
     };
   }, []);
 
+  // Notification capture state (must be declared before the drain useEffect)
+  const [captureHealth, setCaptureHealth] = useState<CaptureHealth | null>(null);
+  const [notificationDrafts, setNotificationDrafts] = useState<NotificationDraft[]>([]);
+  const [showNotificationSettings, setShowNotificationSettings] = useState<boolean>(false);
+  const [showNotificationDrafts, setShowNotificationDrafts] = useState<boolean>(false);
+  const [confirmingDraftId, setConfirmingDraftId] = useState<string | null>(null);
+
+  useEffect(() => {
+    notificationDraftsRef.current = notificationDrafts;
+  }, [notificationDrafts]);
+
+  // Drain native notification queue into snapshot on startup and resume.
+  useEffect(() => {
+    if (!isHydrated) return;
+    let cancelled = false;
+
+    const doDrain = async () => {
+      const health = await getCaptureHealth();
+      setCaptureHealth(health);
+      if (!health.available || health.queueUnavailable) return;
+
+      const snapshot: AppStateSnapshot = {
+        categories,
+        transactions,
+        budgets,
+        recurringList,
+        currency,
+        notificationDrafts: notificationDraftsRef.current,
+        notificationDedup: notificationDedupRef.current,
+      };
+
+      const result = await drainQueueIntoSnapshot(snapshot, async (next) => {
+        if (cancelled) return;
+        // Apply drafts to local state immediately for UI responsiveness.
+        notificationDedupRef.current = next.notificationDedup ?? notificationDedupRef.current;
+        const nextDrafts = next.notificationDrafts ?? [];
+        notificationDraftsRef.current = nextDrafts;
+        setNotificationDrafts(nextDrafts);
+        // Persist full snapshot (storage.ts handles drafts + dedupe).
+        await saveAppState(next);
+      });
+
+      if (!cancelled) {
+        notificationDedupRef.current = result.snapshot.notificationDedup ?? notificationDedupRef.current;
+        const nextDrafts = result.snapshot.notificationDrafts ?? [];
+        notificationDraftsRef.current = nextDrafts;
+        setNotificationDrafts(nextDrafts);
+        setCaptureHealth({ ...health, queueUnavailable: result.queueUnavailable });
+      }
+    };
+
+    void doDrain();
+
+    // Also listen for Capacitor 'resume' event (app returns to foreground).
+    let resumeHandle: PluginListenerHandle | null = null;
+    if (Capacitor.isNativePlatform()) {
+      void CapacitorApp.addListener('resume', () => {
+        void doDrain();
+      }).then((handle) => {
+        resumeHandle = handle;
+      });
+    }
+
+    return () => {
+      cancelled = true;
+      if (resumeHandle) {
+        void resumeHandle.remove();
+      }
+    };
+  }, [isHydrated, categories, transactions, budgets, recurringList, currency]);
+
   // Persist every state change directly to local storage once hydrated.
   useEffect(() => {
     if (!isHydrated) return;
@@ -170,6 +257,8 @@ export default function App() {
       budgets,
       recurringList,
       currency,
+      notificationDrafts,
+      notificationDedup: notificationDedupRef.current,
     };
 
     void saveAppState(snapshot);
@@ -179,6 +268,7 @@ export default function App() {
     budgets,
     recurringList,
     currency,
+    notificationDrafts,
     isHydrated,
   ]);
 
@@ -197,6 +287,12 @@ export default function App() {
   const [txModalType, setTxModalType] = useState<TransactionType>('EXPENSE');
   const [showDataModal, setShowDataModal] = useState<boolean>(false);
 
+  useEffect(() => {
+    if (!showTxModal) {
+      setConfirmingDraftId(null);
+    }
+  }, [showTxModal]);
+
   // Android hardware/gesture back button handling
   const lastBackPressRef = useRef<number>(0);
   const showToastRef = useRef(showToast);
@@ -209,6 +305,8 @@ export default function App() {
     showTxModal,
     showDataModal,
     showSecurityModal,
+    showNotificationSettings,
+    showNotificationDrafts,
     currentTab,
   });
   backStateRef.current = {
@@ -217,6 +315,8 @@ export default function App() {
     showTxModal,
     showDataModal,
     showSecurityModal,
+    showNotificationSettings,
+    showNotificationDrafts,
     currentTab,
   };
 
@@ -236,6 +336,16 @@ export default function App() {
       }
 
       // 2. Jika ada modal terbuka -> tutup modal tersebut
+      if (state.showNotificationDrafts) {
+        lastBackPressRef.current = 0;
+        setShowNotificationDrafts(false);
+        return;
+      }
+      if (state.showNotificationSettings) {
+        lastBackPressRef.current = 0;
+        setShowNotificationSettings(false);
+        return;
+      }
       if (state.showTxModal) {
         lastBackPressRef.current = 0;
         setShowTxModal(false);
@@ -289,12 +399,14 @@ export default function App() {
     setEditingTx(null);
     setTxModalType(type);
     setScannedReceiptData(null);
+    setConfirmingDraftId(null);
     setShowTxModal(true);
   };
 
   const openEditTransaction = (tx: Transaction) => {
     setEditingTx(tx);
     setTxModalType(tx.type);
+    setConfirmingDraftId(null);
     setShowTxModal(true);
   };
 
@@ -336,6 +448,18 @@ export default function App() {
       setTransactions(transactionsRef.current);
     }
 
+    // If this save came from a notification draft confirmation, remove the draft
+    // only after the transaction has been added to state (persisted by effect).
+    if (!existing && confirmingDraftId) {
+      const draftIdToRemove = confirmingDraftId;
+      setNotificationDrafts((prev) => {
+        const next = prev.filter((d) => d.id !== draftIdToRemove);
+        notificationDraftsRef.current = next;
+        return next;
+      });
+      setConfirmingDraftId(null);
+    }
+
     const formattedAmount = formatCurrency(newTx.amount, newTx.currency);
     if (existing) {
       showToast(t.toasts.txUpdated(newTx.description, formattedAmount), 'info');
@@ -359,6 +483,50 @@ export default function App() {
     setTransactions(transactionsRef.current);
     const formattedAmount = formatCurrency(tx.amount, tx.currency);
     showToast(t.toasts.txDeleted(tx.description, formattedAmount), 'delete');
+  };
+
+  // Notification draft handlers
+  const handleConfirmDraft = (draft: NotificationDraft) => {
+    // Pre-fill TransactionModal with draft data
+    setEditingTx(null);
+    setTxModalType(draft.type ?? 'EXPENSE');
+    setConfirmingDraftId(draft.id);
+    setScannedReceiptData({
+      amount: draft.amount ?? undefined,
+      description: draft.description || undefined,
+      categoryId: undefined, // let user pick
+      transactionDate: draft.transactionDate ?? undefined,
+      notes: `From ${draft.sourcePackage}: ${draft.text.slice(0, 200)}`,
+      tags: ['notification', draft.sourcePackage],
+    });
+    setShowNotificationDrafts(false);
+    setShowTxModal(true);
+  };
+
+  const handleDeleteDraft = async (draftId: string) => {
+    const confirmed = window.confirm(t.notificationCapture.confirmDeleteDraft);
+    if (!confirmed) return;
+
+    const nextDrafts = notificationDraftsRef.current.filter((d) => d.id !== draftId);
+    notificationDraftsRef.current = nextDrafts;
+    setNotificationDrafts(nextDrafts);
+
+    const snapshot: AppStateSnapshot = {
+      categories,
+      transactions,
+      budgets,
+      recurringList,
+      currency,
+      notificationDrafts: nextDrafts,
+      notificationDedup: notificationDedupRef.current,
+    };
+    await saveAppState(snapshot);
+
+    showToast(t.notificationCapture.draftDeleted, 'delete');
+  };
+
+  const handleNotificationHealthChange = (health: CaptureHealth) => {
+    setCaptureHealth(health);
   };
 
   // Handlers for Budgets
@@ -568,6 +736,8 @@ export default function App() {
         toggleTheme={toggleTheme}
         onOpenDataModal={() => setShowDataModal(true)}
         onOpenSecurityModal={() => setShowSecurityModal(true)}
+        onOpenNotificationSettings={() => setShowNotificationSettings(true)}
+        notificationDraftsCount={notificationDrafts.length}
       />
 
       {/* Main Content Area (Fluid with responsive clearance for mobile floating dock) */}
@@ -695,6 +865,22 @@ export default function App() {
           setShowSecurityModal(false);
           setIsUnlocked(false);
         }}
+      />
+
+      {/* Notification Capture Settings Modal */}
+      <NotificationSettingsModal
+        isOpen={showNotificationSettings}
+        onClose={() => setShowNotificationSettings(false)}
+        onHealthChange={handleNotificationHealthChange}
+      />
+
+      {/* Notification Drafts Review Modal */}
+      <NotificationDraftsModal
+        isOpen={showNotificationDrafts}
+        onClose={() => setShowNotificationDrafts(false)}
+        drafts={notificationDrafts}
+        onConfirmDraft={handleConfirmDraft}
+        onDeleteDraft={handleDeleteDraft}
       />
 
       {/* Receipt Scanner Modal */}

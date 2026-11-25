@@ -34,10 +34,32 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- Local notification capture: reads title+text of user-selected apps
+             only. Requires the user to grant "Notification access" in Android
+             Settings; no SMS/Accessibility permissions are used. -->
+        <service
+            android:name=".TransactionNotificationService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+    <!-- Android 11+ package visibility: needed to list launcher apps so the
+         user can pick which bank/e-wallet apps to monitor. Only app labels and
+         package names are exposed to this app, never other apps' data. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 </manifest>
