@@ -2,6 +2,8 @@
 
 A professional, client-server financial management application built with **Kotlin Multiplatform (Compose Multiplatform)** and **Ktor Server (PostgreSQL + Exposed + Flyway + Redis)**. Designed to run seamlessly across **Android, iOS, macOS, Windows, Linux, and Web**.
 
+On Android, transaction notifications can be reviewed as drafts before being saved to the ledger.
+
 ---
 
 ## 🏗️ Architecture & Modules
