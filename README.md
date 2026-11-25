@@ -6,7 +6,7 @@ On Android, transaction notifications can be reviewed as drafts before being sav
 
 ---
 
-## 🏗️ Architecture & Modules.
+## 🏗️ Architecture & Modules
 
 ```
 financial-tracker/
