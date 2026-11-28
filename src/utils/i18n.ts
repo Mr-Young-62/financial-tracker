@@ -505,7 +505,7 @@ const idTranslations = {
     biometricEnabledDesc: 'Aktif untuk membuka aplikasi secara cepat',
     biometricDisabledDesc: 'Nonaktif · gunakan PIN 6 digit untuk masuk',
     biometricUnavailableDesc:
-      'Hanya tersedia pada perangkat Android yang mendukung sidik jari.',
+      'Hanya tersedia pada perangkat Android yang mendukung sidik jari atau face ID.',
     unavailableBadge: 'Tidak Tersedia',
     biometricDisabledSuccess:
       'Kunci biometrik dinonaktifkan. Gunakan PIN 6 digit untuk membuka aplikasi.',
@@ -891,7 +891,7 @@ const enTranslations: TranslationDictionary = {
     biometricEnabledDesc: 'Enabled for quick app unlock',
     biometricDisabledDesc: 'Disabled · use your 6-digit PIN to unlock',
     biometricUnavailableDesc:
-      'Only available on Android devices with biometric hardware.',
+      'Only available on Android devices with biometric hardware (fingerprint or face ID).',
     unavailableBadge: 'Unavailable',
     biometricDisabledSuccess:
       'Biometric lock disabled. Use your 6-digit PIN to unlock.',

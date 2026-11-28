@@ -24,6 +24,7 @@ import {
   translateServiceMessage,
   useLanguage,
 } from '../utils/i18n';
+import { ScanFace } from 'lucide-react';
 
 export interface LockScreenProps {
   mode: 'setup' | 'unlock';
@@ -294,7 +295,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({
           <div className="w-full max-w-[320px] mt-3 p-3 rounded-2xl bg-white dark:bg-[#181720] border border-[#EAE5DC] dark:border-[#262432] flex items-center justify-between gap-3 text-left shadow-xs">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-[#FAF7F2] dark:bg-[#252230] text-[#704BEA] dark:text-[#B8B2FF] flex items-center justify-center shrink-0">
-                <Fingerprint className="w-4 h-4" />
+                {biometricInfo.label === 'Wajah' || biometricInfo.label === 'Face ID' ? (
+                  <ScanFace className="w-4 h-4" />
+                ) : (
+                  <Fingerprint className="w-4 h-4" />
+                )}
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-bold text-[#16151D] dark:text-white truncate">
@@ -347,7 +352,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             onClick={() => void handleBiometricAuth()}
             className="mt-2 min-h-[44px] px-4 py-2 text-xs font-bold text-[#704BEA] dark:text-[#B8B2FF] bg-[#704BEA]/10 dark:bg-[#B8B2FF]/15 hover:bg-[#704BEA]/15 dark:hover:bg-[#B8B2FF]/20 rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            <Fingerprint className="w-4 h-4 shrink-0" />
+            {biometricInfo.label === 'Wajah' || biometricInfo.label === 'Face ID' ? (
+                  <ScanFace className="w-4 h-4 shrink-0" />
+                ) : (
+                  <Fingerprint className="w-4 h-4 shrink-0" />
+                )}
             <span>
               {isPromptingBiometric
                 ? t.lockScreen.waitingVerification
@@ -381,7 +390,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({
               aria-label={t.lockScreen.unlockWithBiometric(biometricLabel)}
               className="min-h-[56px] rounded-2xl bg-white dark:bg-[#181720] border border-[#EAE5DC] dark:border-[#262432] shadow-xs hover:bg-[#FAF7F2] dark:hover:bg-[#22202E] active:scale-95 transition-all flex items-center justify-center cursor-pointer disabled:opacity-50"
             >
-              <Fingerprint className="w-6 h-6 text-[#704BEA] dark:text-[#B8B2FF]" />
+              {biometricInfo.label === 'Wajah' || biometricInfo.label === 'Face ID' ? (
+                  <ScanFace className="w-6 h-6 text-[#704BEA] dark:text-[#B8B2FF]" />
+                ) : (
+                  <Fingerprint className="w-6 h-6 text-[#704BEA] dark:text-[#B8B2FF]" />
+                )}
             </button>
           ) : mode === 'setup' && step === 'confirm' ? (
             <button
@@ -536,9 +549,13 @@ export const SecuritySettingsModal: React.FC<SecuritySettingsModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between gap-3 pb-3 border-b border-[#F1ECE3] dark:border-[#252230]">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-[#FAF7F2] dark:bg-[#252230] text-[#704BEA] dark:text-[#B8B2FF] flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
+<div className="w-9 h-9 rounded-xl bg-[#FAF7F2] dark:bg-[#252230] text-[#704BEA] dark:text-[#B8B2FF] flex items-center justify-center shrink-0">
+                {biometricInfo.label === 'Wajah' || biometricInfo.label === 'Face ID' ? (
+                  <ScanFace className="w-4 h-4" />
+                ) : (
+                  <Fingerprint className="w-4 h-4" />
+                )}
+              </div>
             <div className="min-w-0">
               <h3 className="text-base font-extrabold text-[#16151D] dark:text-white truncate">
                 {t.lockScreen.settingsTitle}
@@ -583,7 +600,11 @@ export const SecuritySettingsModal: React.FC<SecuritySettingsModalProps> = ({
           <div className="p-3.5 rounded-2xl bg-[#FAF7F2] dark:bg-[#1E1D27] border border-[#EAE5DC] dark:border-[#2D2A3B] flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-[#704BEA]/15 text-[#704BEA] dark:text-[#B8B2FF] flex items-center justify-center shrink-0">
-                <Fingerprint className="w-4 h-4" />
+                {biometricInfo.label === 'Wajah' || biometricInfo.label === 'Face ID' ? (
+                  <ScanFace className="w-4 h-4" />
+                ) : (
+                  <Fingerprint className="w-4 h-4" />
+                )}
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-bold text-[#16151D] dark:text-white truncate">
